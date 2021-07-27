@@ -1,52 +1,54 @@
 <template>
-  <input v-model="value" type="text">
-  <p><button @click="addItem">AddItem</button></p>
-  <p><button @click="decideWinner">decideWinner</button></p>
-  <p><button @click="calculate">Calculate</button></p>
+    <input v-model="value" type="text">
+    <p><button @click="addItem">AddItem</button></p>
+    <p><button @click="decideWinner">decideWinner</button></p>
+    <p><button @click="calculate">Calculate</button></p>
 
-  <svg ref="chart" class="donut" width="300" height="100%" :viewBox="viewBox">
-    <circle class="donut-hole" :cx="centerOfTheViewBox" :cy="centerOfTheViewBox" :r="radius" fill="grey"></circle>
-      <circle
-        v-for="(item, key) in items"
-        :key="key"
-        :cx="centerOfTheViewBox" :cy="centerOfTheViewBox" :r="radius"
-        fill="transparent"
-        stroke="#b1c94e"
-        :title="item.name"
-        :ref="`items${key}`"
-        @mouseover="log"
-        stroke-width="12"
-        stroke-dasharray="0 100"
-        stroke-dashoffset="25"
-      ></circle>
-    <g v-for="(item, key) in items" :key="key">
-      <text
-          :x="centerOfTheViewBox"
-          :y="centerOfTheViewBox"
-          :style="`transform: rotate(${item.angle}deg) translateX(16px)`"
-          font-family="sans-serif"
-          font-size="2px"
-          fill="white"
-          text-anchor="middle"
-          alignment-baseline="middle"
-      >
-        {{item.name}}
-      </text>
-    </g>
-    <defs>
-        <clipPath id="circleView">
-            <circle :cx="centerOfTheViewBox" :cy="centerOfTheViewBox - 4" :r="radius - 6" fill="#FFFFFF" />
-        </clipPath>
-    </defs>
-   <g class="chart-text">
-      <image
-        :x="centerOfTheViewBox - 12.5" :y="centerOfTheViewBox - 17.5" class="lerich"
-        href="@/assets/Lerich.jpg" alt="Lerich" width="25" height="25"
-        clip-path="url(#circleView)" />
-    </g>
-  </svg>
-  <br>
-  {{ items }}
+  <div class="main-content">
+    <div class="triangle"></div>
+    <svg ref="chart" class="donut" width="300" height="100%" :viewBox="viewBox">
+      <circle class="donut-hole" :cx="centerOfTheViewBox" :cy="centerOfTheViewBox" :r="radius" fill="grey"></circle>
+        <circle
+          v-for="(item, key) in items"
+          :key="key"
+          :cx="centerOfTheViewBox" :cy="centerOfTheViewBox" :r="radius"
+          fill="transparent"
+          :title="item.name"
+          :ref="`items${key}`"
+          @mouseover="log"
+          stroke-width="12"
+          stroke-dasharray="0 100"
+          stroke-dashoffset="25"
+        ></circle>
+      <g v-for="(item, key) in items" :key="key">
+        <text
+            :x="centerOfTheViewBox"
+            :y="centerOfTheViewBox"
+            :style="`transform: rotate(${item.angle}deg) translateX(16px)`"
+            font-family="sans-serif"
+            font-size="2px"
+            fill="white"
+            text-anchor="middle"
+            alignment-baseline="middle"
+        >
+          {{item.name}}
+        </text>
+      </g>
+      <defs>
+          <clipPath id="circleView">
+              <circle :cx="centerOfTheViewBox" :cy="centerOfTheViewBox - 4" :r="radius - 6" fill="#FFFFFF" />
+          </clipPath>
+      </defs>
+     <g class="chart-text">
+        <image
+          :x="centerOfTheViewBox - 12.5" :y="centerOfTheViewBox - 17.5" class="lerich"
+          href="@/assets/Lerich.jpg" alt="Lerich" width="25" height="25"
+          clip-path="url(#circleView)" />
+      </g>
+    </svg>
+  </div>
+    <br>
+    {{ items }}
 </template>
 
 <script>
@@ -235,5 +237,19 @@ export default {
   100% {
     transform:rotate(360deg);
   }
+}
+.main-content {
+  position: relative;
+}
+.triangle {
+  position: absolute;
+  right: calc(50% - 11px);
+  top: 12px;
+  z-index: 2;
+  border-top: 20px solid red;
+  border-right: 10px solid transparent;
+  border-left: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  display: inline-block;
 }
 </style>
