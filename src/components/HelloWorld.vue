@@ -1,12 +1,12 @@
 <template>
-    <input v-model="value" type="text">
-    <p><button @click="addItem">AddItem</button></p>
-    <p><button @click="decideWinner">decideWinner</button></p>
-    <p><button @click="calculate">Calculate</button></p>
+    <p><button @click="decideWinner">выбрать</button></p>
+    <p><button @click="calculate('d')">Подготовить для выборки</button></p>
+    <p><button @click="calculate('p')">Подготовить для наказаний</button></p>
+    <p><label for="time">Время прокрутки: </label> <input v-model="animationDuration" type="number" /></p>
 
-  <div class="main-content">
+  <div class="main-content" v-if="items.length">
     <div class="triangle"></div>
-    <svg ref="chart" class="donut" width="300" height="100%" :viewBox="viewBox">
+    <svg ref="chart" class="donut" :width="width" height="100%" :viewBox="viewBox">
       <circle class="donut-hole" :cx="centerOfTheViewBox" :cy="centerOfTheViewBox" :r="radius" fill="grey"></circle>
         <circle
           v-for="(item, key) in items"
@@ -15,20 +15,18 @@
           fill="transparent"
           :title="item.name"
           :ref="`items${key}`"
-          @mouseover="log"
-          stroke-width="12"
+          :stroke-width="radius"
           stroke-dasharray="0 100"
           stroke-dashoffset="25"
         ></circle>
-      <g v-for="(item, key) in items" :key="key">
+      <g v-for="(item, key) in items" :key="key" :style="`transform: rotate(${item.angle}deg) translateX(${radius / 1.5}px); text-align: left`">
         <text
             :x="centerOfTheViewBox"
             :y="centerOfTheViewBox"
-            :style="`transform: rotate(${item.angle}deg) translateX(16px)`"
             font-family="sans-serif"
-            font-size="2px"
+            font-size="1px"
             fill="white"
-            text-anchor="middle"
+            text-anchor="left"
             alignment-baseline="middle"
         >
           {{item.name}}
@@ -36,23 +34,24 @@
       </g>
       <defs>
           <clipPath id="circleView">
-              <circle :cx="centerOfTheViewBox" :cy="centerOfTheViewBox - 4" :r="radius - 6" fill="#FFFFFF" />
+              <circle :cx="centerOfTheViewBox" :cy="centerOfTheViewBox - 4" :r="radius / 2" />
           </clipPath>
       </defs>
      <g class="chart-text">
         <image
-          :x="centerOfTheViewBox - 12.5" :y="centerOfTheViewBox - 17.5" class="lerich"
-          href="@/assets/Lerich.jpg" alt="Lerich" width="25" height="25"
+          :x="centerOfTheViewBox - diameter / 8" :y="centerOfTheViewBox - diameter / 8 - 5" class="lerich"
+          href="@/assets/Lerich.jpg" alt="Lerich" :width="diameter / 4" :height="diameter / 4"
           clip-path="url(#circleView)" />
       </g>
     </svg>
   </div>
-    <br>
-    {{ items }}
+  <div v-else> Грузиться блядь, падажжи</div>
 </template>
 
 <script>
 import TWEEN from '@tweenjs/tween.js'
+import { GoogleSpreadsheet } from 'google-spreadsheet'
+const API_GOOGLE_KEY = 'AIzaSyCb4nu3aSI5SJ9LH44OBX-D11V93O_uSsc'
 
 export default {
   name: 'HelloWorld',
@@ -61,19 +60,19 @@ export default {
   },
   data () {
     return {
+      animationDuration: 2000,
       value: 0,
-      diameter: 50,
+      diameter: 100,
       offset: 25,
+      width: 600,
       animationSpeed: '0.5s',
-      items: [
-        { name: 'В жопу', value: 10 },
-        { name: 'В рот', value: 10 },
-        { name: 'В пизду', value: 10 }
-      ]
+      itemsForDecision: [],
+      itemsForPunishment: [],
+      items: []
     }
   },
   async mounted () {
-    await this.startAnim()
+    await this.fetchExcelData()
     const animate = (time) => {
       requestAnimationFrame(animate)
       TWEEN.update(time)
@@ -82,13 +81,12 @@ export default {
   },
   computed: {
     viewBox () {
-      return `-25 -25 ${this.diameter} ${this.diameter}`
+      return `-${this.diameter / 4} -${this.diameter / 4} ${this.diameter / 2} ${this.diameter / 2}`
     },
     radius () {
-      return `${this.diameter / (Math.PI)}`
+      return `${this.diameter / (Math.PI) / 2}`
     },
     centerOfTheViewBox () {
-      // return `${this.diameter / 2}`
       return 0
     },
     itemsWithPercentage () {
@@ -96,7 +94,6 @@ export default {
         acc += parseFloat(value)
         return acc
       }, 0)
-      console.log('total:', totalValue)
       return Object.entries(this.items).map(([key, item]) => {
         item.percent = parseFloat(item.value) / totalValue * 100
         return item
@@ -104,24 +101,38 @@ export default {
     }
   },
   methods: {
-    log (event) {
-      console.log(event)
-    },
-    addItem () {
-      this.items.push({ name: 'Test', value: 10 })
-      console.log(this.items)
-    },
     getRandomInt: (min, max) => {
       min = Math.ceil(min)
       max = Math.floor(max)
       return Math.floor(Math.random() * (max - min + 1)) + min
     },
-    async startAnim () {
-      const { animationSpeed } = this
-      await setTimeout(() => {
-        this.$refs.items1.style.transition = `stroke-dasharray ${animationSpeed} ease, stroke-dashoffset ${animationSpeed} ease`
-        this.$refs.items1.style.strokeDasharray = '100 0'
-      }, 20)
+    async fetchExcelData () {
+      const doc = new GoogleSpreadsheet('1WQUE6MLI4dFV_9DLop63OovmLIWGGEN7-18uO1JoWpk')
+      doc.useApiKey(API_GOOGLE_KEY)
+      await doc.loadInfo()
+      await this.fetchDecisionData(doc)
+      await this.fetchPunishmentData(doc)
+      this.items = this.itemsForDecision
+      await this.$nextTick(() => {
+        this.calculate()
+      })
+    },
+    async fetchDecisionData (doc) {
+      const sheet = doc.sheetsByIndex[0]
+      const rows = await sheet.getRows()
+      this.itemsForDecision = rows
+        .filter(row => {
+          const item = row._rawData
+          return !!item[0] && item[4] === 'FALSE' && item[3] === 'TRUE' && item[2] === 'TRUE'
+        })
+        .map(item => ({ name: item._rawData[0], link: item._rawData[1], value: 10 }))
+    },
+    async fetchPunishmentData (doc) {
+      const sheet = doc.sheetsByIndex[2]
+      const rows = await sheet.getRows()
+
+      this.itemsForPunishment = rows
+        .map(item => ({ name: item._rawData[0], value: 10 }))
     },
     getRandomColor () {
       const letters = '0123456789ABCDEF'
@@ -136,7 +147,14 @@ export default {
       const topLine = item.rightCorner / 100 * 360
       return [lowLine, topLine]
     },
-    calculate () {
+    calculate (type) {
+      if (type === 'p') {
+        this.items = this.itemsForPunishment
+      } else if (type === 'd') {
+        this.items = this.itemsForDecision
+      }
+      // this.items = this.items.slice(0, 3)
+      console.log(this.itemsWithPercentage)
       this.$refs.chart.style.transform = 'rotate(0deg)'
       const { animationSpeed, offset } = this
       for (const key in this.itemsWithPercentage) {
@@ -147,7 +165,6 @@ export default {
         node.style.strokeDasharray = itemPerc + ' ' + (100 - itemPerc)
         node.setAttribute('stroke', this.getRandomColor())
         if (key === '0') {
-          node.setAttribute('stroke', 'black')
           node.style.strokeDashoffset = offset
         } else {
           const leftOver = this.itemsWithPercentage.slice(0, key).reduce((acc, item) => {
@@ -157,28 +174,22 @@ export default {
 
           const leftCorner = 100 - leftOver + offset
           node.style.strokeDashoffset = leftCorner
-          console.log(node.style.strokeDashoffset)
         }
         item.leftCorner = parseFloat(node.style.strokeDashoffset) - 25
         item.rightCorner = parseFloat(item.leftCorner) + item.percent
         const [leftCorner, rightCorner] = this.getCorners(item)
         item.angle = ((rightCorner - leftCorner) / 2 + leftCorner) - 90
-        console.log(item.angle, '333')
       }
     },
     decideWinner () {
       const winnerIndx = this.getRandomInt(0, this.itemsWithPercentage.length - 1)
       const winner = this.itemsWithPercentage[winnerIndx]
       const chartNode = this.$refs.chart
-      // chartNode.style.transitionDuration = '10s'
-      // chartNode.style.transform = 'rotate(199deg)'
-      // chartNode.classList.toggle('donut-spin')
 
       const degObj = { value: 0 }
       const finishWith = 360 * 20 - this.getRandomInt(...this.getCorners(winner))
-      console.log(this.getCorners(winner))
       new TWEEN.Tween(degObj)
-        .to({ value: finishWith }, 2000)
+        .to({ value: finishWith }, parseFloat(this.animationDuration))
         .easing(TWEEN.Easing.Quadratic.Out)
         .onUpdate(() => {
           const { value } = degObj
@@ -186,8 +197,7 @@ export default {
         })
         .start()
         .onComplete(() => {
-          alert(winner.name)
-          alert(finishWith - 360 * 20)
+          setTimeout(() => alert(winner.name), 100)
         })
     }
   }
