@@ -1,66 +1,85 @@
 <template>
-    <p><button @click="decideWinner">выбрать</button></p>
-    <p><button @click="calculate('d')">Подготовить для выборки</button></p>
-    <p><button @click="calculate('p')">Подготовить для наказаний</button></p>
-    <p><label for="time">Время прокрутки: </label> <input v-model="animationDuration" type="number" /></p>
+  <p><button class="valera-button" @click="decideWinner">Poehali, nahui!</button></p>
+  <p><label for="time">Время прокрутки в секундах: </label> <input v-model="animationDuration" type="number" /></p>
+
+  <modal v-if="showModal" @close="showModal = false">
+      <template #header>
+        <h2>Ну вот ты и попался пидорок.</h2>
+      </template>
+      <template #body>
+        Победила эта хуета: <a :href="winner.link">{{winner.name}}</a>
+      </template>
+      <template #footer>
+        <button class="valera-button" @click="makeDecision('d')">Ебать, ну поехали...</button>
+        <button class="valera-button valera-button--whack" @click="makeDecision('p')">Skippppppppp</button>
+      </template>
+   </modal>
 
   <div class="main-content" v-if="items.length">
     <div class="triangle"></div>
     <svg ref="chart" class="donut" :width="width" height="100%" :viewBox="viewBox">
-      <circle class="donut-hole" :cx="centerOfTheViewBox" :cy="centerOfTheViewBox" :r="radius" fill="grey"></circle>
-        <circle
-          v-for="(item, key) in items"
-          :key="key"
-          :cx="centerOfTheViewBox" :cy="centerOfTheViewBox" :r="radius"
-          fill="transparent"
-          :title="item.name"
-          :ref="`items${key}`"
-          :stroke-width="radius"
-          stroke-dasharray="0 100"
-          stroke-dashoffset="25"
+      <circle class="donut-hole" :cx="centerOfTheViewBox" :cy="centerOfTheViewBox" :r="radius" fill="transparent"></circle>
+      <circle
+        v-for="(item, key) in items"
+        :key="key"
+        :cx="centerOfTheViewBox" :cy="centerOfTheViewBox" :r="radius"
+        fill="transparent"
+        :title="item.name"
+        :ref="`items${key}`"
+        :stroke-width="radius"
+        stroke-dasharray="0 100"
+        stroke-dashoffset="25"
         ></circle>
       <g v-for="(item, key) in items" :key="key" :style="`transform: rotate(${item.angle}deg) translateX(${radius / 1.5}px); text-align: left`">
-        <text
-            :x="centerOfTheViewBox"
-            :y="centerOfTheViewBox"
-            font-family="sans-serif"
-            font-size="1px"
-            fill="white"
-            text-anchor="left"
-            alignment-baseline="middle"
+      <text
+        :x="centerOfTheViewBox"
+        :y="centerOfTheViewBox"
+        font-family="sans-serif"
+        font-size="1px"
+        fill="white"
+        text-anchor="left"
+        alignment-baseline="middle"
         >
-          {{item.name}}
-        </text>
+
+        {{ truncateString(item.name, 20) }}
+      </text>
       </g>
       <defs>
-          <clipPath id="circleView">
-              <circle :cx="centerOfTheViewBox" :cy="centerOfTheViewBox - 4" :r="radius / 2" />
-          </clipPath>
+      <clipPath id="circleView">
+      <circle :cx="centerOfTheViewBox" :cy="centerOfTheViewBox - 4" :r="radius / 2" />
+      </clipPath>
       </defs>
-     <g class="chart-text">
-        <image
-          :x="centerOfTheViewBox - diameter / 8" :y="centerOfTheViewBox - diameter / 8 - 5" class="lerich"
-          href="@/assets/Lerich.jpg" alt="Lerich" :width="diameter / 4" :height="diameter / 4"
-          clip-path="url(#circleView)" />
+      <g class="chart-text">
+      <image
+        :x="centerOfTheViewBox - diameter / 8" :y="centerOfTheViewBox - diameter / 8 - 5"
+        class="lerich"
+        href="@/assets/Lerich.jpg"
+        alt="Lerich" :width="diameter / 4" :height="diameter / 4"
+        clip-path="url(#circleView)" />
       </g>
     </svg>
   </div>
-  <div v-else> Грузиться блядь, падажжи</div>
+  <div v-else> Грузится блядь, падажжи</div>
 </template>
 
 <script>
 import TWEEN from '@tweenjs/tween.js'
 import { GoogleSpreadsheet } from 'google-spreadsheet'
+import { Sound, truncateString } from '@/helpers'
+import Modal from '@/components/Modal'
 const API_GOOGLE_KEY = 'AIzaSyCb4nu3aSI5SJ9LH44OBX-D11V93O_uSsc'
 
 export default {
   name: 'HelloWorld',
+  components: { Modal },
   props: {
     msg: String
   },
   data () {
     return {
-      animationDuration: 2000,
+      showModal: false,
+      animationDuration: 142,
+      winner: null,
       value: 0,
       diameter: 100,
       offset: 25,
@@ -101,6 +120,11 @@ export default {
     }
   },
   methods: {
+    async makeDecision (decision) {
+      await this.calculate(decision)
+      this.showModal = false
+    },
+    truncateString,
     getRandomInt: (min, max) => {
       min = Math.ceil(min)
       max = Math.floor(max)
@@ -147,16 +171,16 @@ export default {
       const topLine = item.rightCorner / 100 * 360
       return [lowLine, topLine]
     },
-    calculate (type) {
+    async calculate (type) {
+      // TODO: no magic strings!
       if (type === 'p') {
         this.items = this.itemsForPunishment
       } else if (type === 'd') {
         this.items = this.itemsForDecision
       }
-      // this.items = this.items.slice(0, 3)
-      console.log(this.itemsWithPercentage)
       this.$refs.chart.style.transform = 'rotate(0deg)'
       const { animationSpeed, offset } = this
+      await this.$nextTick()
       for (const key in this.itemsWithPercentage) {
         const item = this.items[key]
         const itemPerc = item.percent
@@ -184,20 +208,30 @@ export default {
     decideWinner () {
       const winnerIndx = this.getRandomInt(0, this.itemsWithPercentage.length - 1)
       const winner = this.itemsWithPercentage[winnerIndx]
+      this.winner = winner
       const chartNode = this.$refs.chart
 
       const degObj = { value: 0 }
-      const finishWith = 360 * 20 - this.getRandomInt(...this.getCorners(winner))
+      const finishWith = 360 * this.animationDuration - this.getRandomInt(...this.getCorners(winner))
+      const song = new Sound('/ZAKAT.mp3', 40, false)
+      const abchihba = new Sound('/abchihba.mp3', 100, false)
       new TWEEN.Tween(degObj)
-        .to({ value: finishWith }, parseFloat(this.animationDuration))
-        .easing(TWEEN.Easing.Quadratic.Out)
+        .to({ value: finishWith }, parseFloat(this.animationDuration * 1000))
+        .easing(TWEEN.Easing.Cubic.Out)
+        .onStart(() => {
+          song.start()
+        })
         .onUpdate(() => {
           const { value } = degObj
           chartNode.style.transform = `rotate(${value}deg)`
         })
         .start()
         .onComplete(() => {
-          setTimeout(() => alert(winner.name), 100)
+          song.stop()
+          abchihba.start()
+          setTimeout(() => {
+            this.showModal = true
+          }, 500)
         })
     }
   }
@@ -208,8 +242,8 @@ export default {
 <style scoped lang="scss">
 * {
   -webkit-box-sizing: border-box;
-     -moz-box-sizing: border-box;
-          box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
 }
 .donut-spin {
   animation: spin linear infinite;
@@ -243,6 +277,10 @@ export default {
   -webkit-transform: translateY(0.7em);
   transform: translateY(0.7em);
 }
+.answer {
+  transform: translateZ(30px);
+}
+
 @keyframes spin {
   100% {
     transform:rotate(360deg);
@@ -261,5 +299,46 @@ export default {
   border-left: 10px solid transparent;
   border-bottom: 10px solid transparent;
   display: inline-block;
+}
+
+button.valera-button {
+  z-index: 1;
+  position: relative;
+  font-size: inherit;
+  font-family: inherit;
+  color: white;
+  padding: 0.5em 1em;
+  outline: none;
+  border: none;
+  background-color: hsl(236, 32%, 26%);
+  overflow: hidden;
+  transition: color 0.4s ease-in-out;
+}
+
+button.valera-button::before {
+  content: '';
+  z-index: -1;
+  position: absolute;
+  top: 100%;
+  left: 100%;
+  width: 1em;
+  height: 1em;
+  border-radius: 50%;
+  background-color: #3cefff;
+  transform-origin: right;
+  transform: translate3d(-50%, -50%, 0) scale3d(0, 0, 0);
+  transition: transform 0.45s ease-in-out;
+}
+
+button.valera-button:hover {
+  cursor: pointer;
+  color: #161616;
+}
+
+button.valera-button:hover::before {
+  transform: translate3d(-50%, -50%, 0) scale3d(15, 15, 15);
+}
+.valera-button.valera-button--whack {
+  margin-top: 10px;
 }
 </style>
